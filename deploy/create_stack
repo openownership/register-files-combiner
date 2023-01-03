@@ -1,0 +1,20 @@
+#!/usr/bin/env ruby
+
+require 'dotenv'
+Dotenv.load('.deploy.env')
+
+require_relative 'stack_creator'
+
+stack_name = ARGV[0]
+
+stack_creator = StackCreator.new(
+  region: ENV['AWS_REGION'],
+  access_key_id: ENV['ACCESS_KEY_ID'],
+  secret_access_key: ENV['SECRET_ACCESS_KEY'],
+  account_id: ENV.fetch('AWS_ACCOUNT_ID')
+)
+
+stack_creator.call(
+  stack_name,
+  {}
+)

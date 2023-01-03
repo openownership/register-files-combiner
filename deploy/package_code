@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+
+require 'dotenv'
+Dotenv.load('.deploy.env')
+
+require_relative 'code_packager'
+
+branch = ARGV[0]
+# TODO: git ref
+
+code_packager = CodePackager.new(
+  s3_bucket: ENV['CODE_BUCKET'],
+  repo: ENV['REPO_NAME'],
+  region: ENV['AWS_REGION'],
+  access_key_id: ENV['ACCESS_KEY_ID'],
+  secret_access_key: ENV['SECRET_ACCESS_KEY']
+)
+
+code_packager.call(
+  s3_path: File.join(ENV['CODE_PREFIX'], "register_bods_exporter_#{branch}.zip"),
+  branch: branch
+)

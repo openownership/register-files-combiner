@@ -1,0 +1,14 @@
+#!/usr/bin/env ruby
+
+require_relative '../lambda_function'
+
+export_id = ARGV[0]
+s3_path = ARGV[1]
+
+result = process_event_body({
+  'msg_type' => 'EXTRACT_PART',
+  'export_id' => export_id,
+  's3_path' => s3_path
+})
+
+RegisterFilesCombiner::LOGGER.info "RESULT: #{result}"

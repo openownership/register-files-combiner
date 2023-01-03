@@ -1,0 +1,11 @@
+#!/usr/bin/env ruby
+
+require_relative '../lambda_function'
+
+export_id = ARGV[0]
+
+result = process_event_body({
+  'msg_type' => 'REDUCE_RESULTS',
+  'export_id' => export_id
+})
+RegisterFilesCombiner::LOGGER.info "RESULT: #{result}"

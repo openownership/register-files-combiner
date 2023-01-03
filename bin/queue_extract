@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+
+require_relative '../lambda_function'
+
+export_id = ARGV[0]
+
+result = process_event_body({
+  'msg_type' => 'QUEUE_EXTRACT',
+  'export_id' => export_id
+})
+
+RegisterFilesCombiner::LOGGER.info "RESULT: #{result}"

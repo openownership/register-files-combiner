@@ -1,0 +1,22 @@
+#!/usr/bin/env ruby
+
+require 'dotenv'
+Dotenv.load('.deploy.env')
+
+require_relative 'code_deployer'
+
+stack_name = ARGV[0]
+code_version = ARGV[1]
+env_name = ARGV[2]
+
+code_deployer = CodeDeployer.new(
+  region: ENV['AWS_REGION'],
+  access_key_id: ENV['ACCESS_KEY_ID'],
+  secret_access_key: ENV['SECRET_ACCESS_KEY'],
+  s3_bucket: ENV['CODE_BUCKET'],
+  account_id: ENV.fetch('AWS_ACCOUNT_ID')
+)
+
+s3_path = File.join(ENV['CODE_PREFIX'], "register_bods_exporter_#{code_version}.zip")
+env_path = File.expand_path("../envs/#{env_name}.json", __FILE__)
+code_deployer.call(stack_name, s3_path, env: JSON.parse(File.read(env_path)))
