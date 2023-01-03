@@ -1,7 +1,6 @@
 module RegisterFilesCombiner
   class StepReducer
     def initialize(
-      s3_adapter:       S3_ADAPTER,
       s3_bucket:        S3_BUCKET,
       s3_prefix:        S3_PREFIX,
       athena_adapter:   ATHENA_ADAPTER,
@@ -10,7 +9,6 @@ module RegisterFilesCombiner
     )
       @athena_adapter  = athena_adapter
       @athena_database = athena_database
-      @s3_adapter      = s3_adapter
       @s3_bucket       = s3_bucket
       @s3_prefix       = s3_prefix
       @output_location = "s3://#{s3_bucket}/athena_results"
@@ -29,7 +27,7 @@ module RegisterFilesCombiner
 
     private
 
-    attr_reader :s3_bucket, :athena_database, :s3_adapter, :athena_adapter,
+    attr_reader :s3_bucket, :athena_database, :athena_adapter,
                 :bods_export_table, :output_location, :bods_tmp2_table
 
     def repair_table(table_name)
