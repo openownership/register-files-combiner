@@ -27,8 +27,7 @@ module RegisterFilesCombiner
 
     private
 
-    attr_reader :s3_bucket, :athena_database, :athena_adapter,
-                :bods_export_table, :output_location, :bods_tmp2_table
+    attr_reader :s3_bucket, :athena_database, :athena_adapter, :bods_export_table, :output_location
 
     def repair_table(table_name)
       athena_query = athena_adapter.start_query_execution({

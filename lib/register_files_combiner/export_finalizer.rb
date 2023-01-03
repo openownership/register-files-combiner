@@ -1,12 +1,6 @@
-require 'stringio'
-require 'zlib'
-
 module RegisterFilesCombiner
   class ExportFinalizer
-    def initialize(
-      s3_adapter:  S3_ADAPTER,
-      s3_bucket:   S3_BUCKET
-    )
+    def initialize(s3_adapter: S3_ADAPTER, s3_bucket: S3_BUCKET)
       @s3_adapter = s3_adapter
       @s3_bucket = s3_bucket
     end

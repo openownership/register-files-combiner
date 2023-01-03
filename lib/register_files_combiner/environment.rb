@@ -2,10 +2,9 @@ require 'dotenv'
 
 require 'register_common/structs/aws_credentials'
 require 'register_common/adapters/athena_adapter'
+require 'register_common/adapters/error_adapter'
 require 'register_common/adapters/s3_adapter'
-
-require_relative 'adapters/error_adapter'
-require_relative 'adapters/sqs_adapter'
+require 'register_common/adapters/sqs_adapter'
 
 module RegisterFilesCombiner
   NotTestEnvError = Class.new(StandardError)
@@ -68,21 +67,16 @@ module RegisterFilesCombiner
 
   # Initialize adapters
 
-  AWS_AUTH = {
-    access_key_id: ENV['BODS_EXPORT_AWS_ACCESS_KEY_ID'], # || ENV['AWS_ACCESS_KEY_ID'],
-    secret_access_key: ENV['BODS_EXPORT_AWS_SECRET_ACCESS_KEY'], # || ENV['AWS_SECRET_ACCESS_KEY'],
-    region: ENV.fetch('AWS_REGION', 'eu-west-1')
-  }
   AWS_CREDENTIALS = RegisterCommon::Structs::AwsCredentials.new(
-    AWS_AUTH[:region],
-    AWS_AUTH[:access_key_id],
-    AWS_AUTH[:secret_access_key]
+    ENV.fetch('AWS_REGION', 'eu-west-1'),
+    ENV['BODS_EXPORT_AWS_ACCESS_KEY_ID'], # || ENV['AWS_ACCESS_KEY_ID'],
+    ENV['BODS_EXPORT_AWS_SECRET_ACCESS_KEY'], # || ENV['AWS_SECRET_ACCESS_KEY'],
   )
 
   S3_ADAPTER = RegisterCommon::Adapters::S3Adapter.new(credentials: AWS_CREDENTIALS)
-  SQS_ADAPTER = Adapters::SqsAdapter.new(**AWS_AUTH)
+  SQS_ADAPTER = RegisterCommon::Adapters::SqsAdapter.new(credentials: AWS_CREDENTIALS)
   ATHENA_ADAPTER = RegisterCommon::Adapters::AthenaAdapter.new(credentials: AWS_CREDENTIALS)
-  ERROR_ADAPTER = Adapters::ErrorAdapter.new
+  ERROR_ADAPTER = RegisterCommon::Adapters::ErrorAdapter.new
 
   # Settings
   S3_BUCKET = ENV['BODS_EXPORT_S3_BUCKET_NAME']
