@@ -1,3 +1,6 @@
+load_paths = Dir['./vendor/bundle/ruby/2.7.0/bundler/gems/**/lib']
+$LOAD_PATH.unshift(*load_paths)
+
 require 'json'
 require_relative './lib/register_files_combiner'
 require_relative './lib/register_files_combiner/step_reducer'

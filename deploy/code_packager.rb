@@ -48,7 +48,7 @@ class CodePackager
         run_shell_cmd("gem install bundler")
         run_shell_cmd("bundle config set --local path './vendor/bundle'")
         run_shell_cmd("bundle install")
-        run_shell_cmd("zip -r #{zip_path} lambda_function.rb vendor lib config")
+        run_shell_cmd("zip -r #{zip_path} lambda_function.rb Gemfile* *.gemspec vendor lib config")
       end
     end
   end
