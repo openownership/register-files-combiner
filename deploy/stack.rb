@@ -18,7 +18,7 @@ class Stack
   end
 
   def athena_table_name
-    "#{PREFIX}_parts_#{name}"
+    "bodsv2" # "#{PREFIX}_parts_#{name}"
   end
 
   def s3_parts_path
