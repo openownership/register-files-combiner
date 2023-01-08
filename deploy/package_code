@@ -17,6 +17,6 @@ code_packager = CodePackager.new(
 )
 
 code_packager.call(
-  s3_path: File.join(ENV['CODE_PREFIX'], "register_bods_exporter_#{branch}.zip"),
+  s3_path: File.join(ENV['CODE_PREFIX'], "register_files_combiner_#{branch}.zip"),
   branch: branch
 )
