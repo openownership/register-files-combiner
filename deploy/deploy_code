@@ -17,6 +17,6 @@ code_deployer = CodeDeployer.new(
   account_id: ENV.fetch('AWS_ACCOUNT_ID')
 )
 
-s3_path = File.join(ENV['CODE_PREFIX'], "register_bods_exporter_#{code_version}.zip")
+s3_path = File.join(ENV['CODE_PREFIX'], "register_files_combiner_#{code_version}.zip")
 env_path = File.expand_path("../envs/#{env_name}.json", __FILE__)
 code_deployer.call(stack_name, s3_path, env: JSON.parse(File.read(env_path)))
