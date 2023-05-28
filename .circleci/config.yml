@@ -1,0 +1,42 @@
+version: 2.1
+jobs:
+  build:
+    parallelism: 1
+    working_directory: ~/openownership/register-files-combiner
+
+    docker:
+
+      - image: cimg/ruby:3.1.2-browsers
+        environment:
+          BUNDLE_JOBS: 3
+          BUNDLE_RETRY: 3
+          BUNDLE_PATH: vendor/bundle
+
+    steps:
+
+      - checkout
+
+      # Which version of bundler?
+      - run:
+          name: Which bundler?
+          command: bundle -v
+
+      # Restore bundle cache
+      - restore_cache:
+          keys:
+            - app-bundle-v3-{{ checksum "Gemfile.lock" }}
+
+      - run:
+          name: Bundle install
+          command: bundle check || bundle install
+
+      # Store bundle cache
+      - save_cache:
+          key: app-bundle-v3-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+
+      - run:
+          command: bundle exec rspec
+          environment:
+            RACK_ENV: test
