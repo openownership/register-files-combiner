@@ -9,14 +9,14 @@ branch = ARGV[0]
 # TODO: git ref
 
 code_packager = CodePackager.new(
-  s3_bucket: ENV['CODE_BUCKET'],
-  repo: ENV['REPO_NAME'],
-  region: ENV['AWS_REGION'],
-  access_key_id: ENV['ACCESS_KEY_ID'],
-  secret_access_key: ENV['SECRET_ACCESS_KEY']
+  s3_bucket: ENV.fetch('CODE_BUCKET', nil),
+  repo: ENV.fetch('REPO_NAME', nil),
+  region: ENV.fetch('AWS_REGION', nil),
+  access_key_id: ENV.fetch('ACCESS_KEY_ID', nil),
+  secret_access_key: ENV.fetch('SECRET_ACCESS_KEY', nil),
 )
 
 code_packager.call(
-  s3_path: File.join(ENV['CODE_PREFIX'], "register_files_combiner_#{branch}.zip"),
-  branch: branch
+  s3_path: File.join(ENV.fetch('CODE_PREFIX', nil), "register_files_combiner_#{branch}.zip"),
+  branch: branch,
 )

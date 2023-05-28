@@ -4,7 +4,7 @@ require 'json'
 module RegisterFilesCombiner
   module Adapters
     class SqsFakeAdapter
-      DEFAULT_IDEMPOTENCY_TOKEN = 'idem-fake'
+      DEFAULT_IDEMPOTENCY_TOKEN = 'idem-fake'.freeze
 
       class FakeQueue
         def initialize
@@ -28,7 +28,7 @@ module RegisterFilesCombiner
 
             {
               receipt_handle: key,
-              content: JSON.parse(content)
+              content: JSON.parse(content),
             }
           end
         end

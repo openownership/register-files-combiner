@@ -40,4 +40,5 @@ Gem::Specification.new do |spec|
   spec.add_dependency 'activesupport', '~>6.1.4.1'
   spec.add_dependency 'dotenv'
   spec.add_dependency 'rexml'
+  spec.metadata['rubygems_mfa_required'] = 'true'
 end

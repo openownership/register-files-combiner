@@ -13,7 +13,7 @@ require_relative 'register_files_combiner/version'
 # Require and setup specific to environment
 require_relative 'register_files_combiner/environment'
 
-Time.zone='UTC'
+Time.zone = 'UTC'
 ActiveSupport::JSON::Encoding.use_standard_json_time_format = true
 ActiveSupport::JSON::Encoding.escape_html_entities_in_json = true
 

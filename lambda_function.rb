@@ -30,15 +30,15 @@ def process_event_body(body)
 end
 
 def lambda_handler(event:, context:)
-    response =
-      if event['Records']
-        event['Records'].map do |record|
-          body = JSON.parse(record['body'])
-          process_event_body body
-        end
-      else
-        process_event_body event
+  response =
+    if event['Records']
+      event['Records'].map do |record|
+        body = JSON.parse(record['body'])
+        process_event_body body
       end
+    else
+      process_event_body event
+    end
 
-    { statusCode: 200, body: response }
+  { statusCode: 200, body: response }
 end

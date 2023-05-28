@@ -11,12 +11,12 @@ require 'aws-sdk-states'
 
 class StackCreator
   def initialize(region:, account_id:, access_key_id:, secret_access_key:)
-    @logger = Logger.new(STDOUT)
+    @logger = Logger.new($stdout)
 
     auth = {
       region: region,
       access_key_id: access_key_id,
-      secret_access_key: secret_access_key
+      secret_access_key: secret_access_key,
     }
 
     @aws_region = region
@@ -30,7 +30,7 @@ class StackCreator
   end
 
   # TODO: adding logging, ARN to stacks, script file to call it
-  def call(name, env)
+  def call(name, _env)
     stack = Stack.new(name, aws_region: aws_region, account_id: aws_account_id)
 
     # create resources
@@ -54,25 +54,27 @@ class StackCreator
     # TODO: disable public objects
     logger.info "Creating S3 Bucket #{stack.bucket_name}"
     resp = s3_client.create_bucket(
-      bucket: stack.bucket_name
+      bucket: stack.bucket_name,
     )
     logger.info "Response #{resp.to_h}"
-    logger.info "Waiting for bucket to exist..." 
+    logger.info "Waiting for bucket to exist..."
 
     s3_client.wait_until(:bucket_exists, { bucket: stack.bucket_name })
 
-    logger.info "S3 Bucket created successfully" 
+    logger.info "S3 Bucket created successfully"
   end
 
   def create_extraction_sqs_queue(stack)
     logger.info "Creating SQS Queue #{stack.extraction_sqs_queue_name}"
 
-    resp = sqs_client.create_queue({
-      queue_name: stack.extraction_sqs_queue_name,
-      attributes: {
-        "VisibilityTimeout" => "1200", # 20 minutes
-      }
-    })
+    resp = sqs_client.create_queue(
+      {
+        queue_name: stack.extraction_sqs_queue_name,
+        attributes: {
+          "VisibilityTimeout" => "1200", # 20 minutes
+        },
+      },
+    )
 
     logger.info "Response #{resp.to_h}"
     logger.info "Waiting for SQS queue to exist..."
@@ -95,17 +97,17 @@ class StackCreator
     ddl_command = <<~SQL
       CREATE EXTERNAL TABLE `#{stack.athena_database}.#{stack.athena_table_name}`(
         `content` string)
-      PARTITIONED BY ( 
-        `source` string, 
+      PARTITIONED BY (#{' '}
+        `source` string,#{' '}
         `year` string,
         `month` string,
         `day` string)
-      ROW FORMAT DELIMITED 
-        FIELDS TERMINATED BY '\u0001' 
-        LINES TERMINATED BY '\n' 
-      STORED AS INPUTFORMAT 
-        'org.apache.hadoop.mapred.TextInputFormat' 
-      OUTPUTFORMAT 
+      ROW FORMAT DELIMITED#{' '}
+        FIELDS TERMINATED BY '\u0001'#{' '}
+        LINES TERMINATED BY '\n'#{' '}
+      STORED AS INPUTFORMAT#{' '}
+        'org.apache.hadoop.mapred.TextInputFormat'#{' '}
+      OUTPUTFORMAT#{' '}
         'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat'
       LOCATION
         's3://#{stack.bucket_name}/#{stack.s3_parts_path}'
@@ -124,16 +126,17 @@ class StackCreator
       query_string: query,
       client_request_token: Digest::MD5.hexdigest(query)[0...32],
       result_configuration: {
-        output_location: output_location
-      }
+        output_location: output_location,
+      },
     )
     20.times do
       query = athena_client.get_query_execution(
-        query_execution_id: execution.query_execution_id
+        query_execution_id: execution.query_execution_id,
       )
       if query.query_execution.status.state == 'SUCCEEDED'
         return query
       end
+
       sleep 3
     end
 
@@ -145,50 +148,56 @@ class StackCreator
   def create_orchestration_lambda(stack)
     # Create IAM role for lambda function
     logger.info "Creating role: #{stack.orchestration_function_role_name}"
-    role = iam_client.create_role({
-      assume_role_policy_document: {
-        "Version": "2012-10-17",
-        "Statement": [
-          {
-            "Effect": "Allow",
-            "Principal": {
-              "Service": "lambda.amazonaws.com"
+    role = iam_client.create_role(
+      {
+        assume_role_policy_document: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: {
+                Service: "lambda.amazonaws.com",
+              },
+              Action: "sts:AssumeRole",
             },
-            "Action": "sts:AssumeRole"
-          }
-        ]
-      }.to_json,
-      path: '/',
-      role_name: stack.orchestration_function_role_name
-    })
+          ],
+        }.to_json,
+        path: '/',
+        role_name: stack.orchestration_function_role_name,
+      },
+    )
     logger.info "Resp #{role.to_h}"
     logger.info "Waiting for role to be created..."
     iam_client.wait_until(
       :role_exists,
-      { role_name: stack.orchestration_function_role_name }
+      { role_name: stack.orchestration_function_role_name },
     )
     logger.info "Role created successfully"
 
     # Create Policy
-    resp = iam_client.create_policy({
-      policy_name: stack.orchestration_function_policy_name,
-      policy_document: orchestration_lambda_policy(stack).to_json
-    })
+    resp = iam_client.create_policy(
+      {
+        policy_name: stack.orchestration_function_policy_name,
+        policy_document: orchestration_lambda_policy(stack).to_json,
+      },
+    )
     logger.info "Resp #{resp.to_h}"
     logger.info "Awaiting for policy to be created"
     policy_arn = resp.policy.arn
     iam_client.wait_until(
       :policy_exists,
-      { policy_arn: policy_arn }
+      { policy_arn: policy_arn },
     )
     logger.info "Policy created successfully"
 
     # Attach Policy to Role
     logger.info "Attaching policy to role"
-    resp = iam_client.attach_role_policy({
-      role_name: stack.orchestration_function_role_name,
-      policy_arn: policy_arn
-    })
+    iam_client.attach_role_policy(
+      {
+        role_name: stack.orchestration_function_role_name,
+        policy_arn: policy_arn,
+      },
+    )
     logger.info "Attached policy to role"
 
     role_arn = role.role.arn
@@ -201,25 +210,25 @@ class StackCreator
     resp = lambda_client.create_function(
       description: "Register Export Orchestration",
       environment: {
-        variables: stack.orchestration_env_variables
+        variables: stack.orchestration_env_variables,
       },
       code: {
         s3_bucket: 'oo-register-dev', # dummy function
-        s3_key: "code/register_files_combiner_main.zip" # dummy code
+        s3_key: "code/register_files_combiner_main.zip", # dummy code
       },
       function_name: stack.orchestration_function_name,
       handler: "lambda_function.lambda_handler",
-      memory_size: 9000, 
+      memory_size: 9000,
       publish: true,
       role: role_arn,
       runtime: 'ruby2.7',
-      timeout: 850
+      timeout: 850,
     )
     logger.info "Response: #{resp.to_h}"
     logger.info "Waiting for function to exist..."
     lambda_client.wait_until(
       :function_exists,
-      { function_name: stack.orchestration_function_name }
+      { function_name: stack.orchestration_function_name },
     )
     logger.info "Lambda function created successfully"
 
@@ -227,13 +236,13 @@ class StackCreator
     logger.info "Updating function concurrency"
     resp = lambda_client.put_function_concurrency(
       function_name: stack.orchestration_function_name,
-      reserved_concurrent_executions: 25
+      reserved_concurrent_executions: 25,
     )
     logger.info "Response #{resp.to_h}"
     logger.info "Waiting for function to be updated"
     lambda_client.wait_until(
       :function_updated,
-      { function_name: stack.orchestration_function_name }
+      { function_name: stack.orchestration_function_name },
     )
 
     # Create SQS trigger
@@ -243,12 +252,12 @@ class StackCreator
       event_source_arn: queue_arn,
       function_name: stack.orchestration_function_name,
       enabled: true,
-      batch_size: 1
+      batch_size: 1,
     )
     logger.info "Waiting for function to be updated"
     lambda_client.wait_until(
       :function_updated,
-      { function_name: stack.orchestration_function_name }
+      { function_name: stack.orchestration_function_name },
     )
     logger.info "Function updated successfully"
     logger.info "Function creation completed successfully"
@@ -257,45 +266,51 @@ class StackCreator
   def create_step_function(stack)
     # Create Role
     logger.info "Creating role #{stack.step_function_role_name}"
-    resp = iam_client.create_role({
-      assume_role_policy_document: {
-        "Version": "2012-10-17",
-        "Statement": [
-          {
-            "Effect": "Allow",
-            "Principal": {
-              "Service": "states.amazonaws.com"
+    resp = iam_client.create_role(
+      {
+        assume_role_policy_document: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: {
+                Service: "states.amazonaws.com",
+              },
+              Action: "sts:AssumeRole",
             },
-            "Action": "sts:AssumeRole"
-          }
-        ]
-      }.to_json,
-      path: '/',
-      role_name: stack.step_function_role_name
-    })
+          ],
+        }.to_json,
+        path: '/',
+        role_name: stack.step_function_role_name,
+      },
+    )
     role_arn = resp.role.arn
     logger.info "Response #{resp.to_h}"
 
     # Create Policy
-    resp = iam_client.create_policy({
-      policy_name: stack.step_function_policy_name,
-      policy_document: step_function_policy(stack).to_json
-    })
+    resp = iam_client.create_policy(
+      {
+        policy_name: stack.step_function_policy_name,
+        policy_document: step_function_policy(stack).to_json,
+      },
+    )
     logger.info "Resp #{resp.to_h}"
     logger.info "Awaiting for policy to be created"
     policy_arn = resp.policy.arn
     iam_client.wait_until(
       :policy_exists,
-      { policy_arn: policy_arn }
+      { policy_arn: policy_arn },
     )
     logger.info "Policy created successfully"
 
     # Attach Policy to Role
     logger.info "Attaching policy to role"
-    resp = iam_client.attach_role_policy({
-      role_name: stack.step_function_role_name,
-      policy_arn: policy_arn
-    })
+    iam_client.attach_role_policy(
+      {
+        role_name: stack.step_function_role_name,
+        policy_arn: policy_arn,
+      },
+    )
     logger.info "Attached policy to role"
 
     # Create Step function
@@ -305,7 +320,7 @@ class StackCreator
       name: stack.step_function_name,
       definition: definition.to_json,
       role_arn: role_arn,
-      type: "STANDARD"
+      type: "STANDARD",
     )
     logger.info "Response #{resp.to_h}"
     logger.info "Step function created successfully"
@@ -313,112 +328,112 @@ class StackCreator
 
   # IAM Policy Definitions
 
-  def orchestration_lambda_policy(stack)
+  def orchestration_lambda_policy(_stack)
     {
-      "Version": "2012-10-17",
-      "Statement": [
-          {
-              "Effect": "Allow",
-              "Action": [
-                  "sqs:ReceiveMessage",
-                  "sqs:DeleteMessage",
-                  "sqs:GetQueueAttributes",
-                  "logs:CreateLogGroup",
-                  "logs:CreateLogStream",
-                  "logs:PutLogEvents",
-                  "athena:*",
-                  "sqs:*",
-                  "glue:*",
-                  "s3:*",
-                  "lambda:*",
-                  "dynamodb:*",
-                  "cloudwatch:PutMetricAlarm",
-                  "cloudwatch:DescribeAlarms",
-                  "cloudwatch:DeleteAlarms",
-                  "cloudformation:DescribeStacks",
-                  "cloudformation:ListStackResources",
-                  "cloudwatch:ListMetrics",
-                  "cloudwatch:GetMetricData",
-                  "ec2:DescribeSecurityGroups",
-                  "ec2:DescribeSubnets",
-                  "ec2:DescribeVpcs",
-                  "kms:ListAliases",
-                  "iam:GetPolicy",
-                  "iam:GetPolicyVersion",
-                  "iam:GetRole",
-                  "iam:GetRolePolicy",
-                  "iam:ListAttachedRolePolicies",
-                  "iam:ListRolePolicies",
-                  "iam:ListRoles",
-                  "lambda:*",
-                  "logs:DescribeLogGroups",
-                  "states:DescribeStateMachine",
-                  "states:ListStateMachines",
-                  "tag:GetResources",
-                  "xray:GetTraceSummaries",
-                  "xray:BatchGetTraces"
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: [
+            "sqs:ReceiveMessage",
+            "sqs:DeleteMessage",
+            "sqs:GetQueueAttributes",
+            "logs:CreateLogGroup",
+            "logs:CreateLogStream",
+            "logs:PutLogEvents",
+            "athena:*",
+            "sqs:*",
+            "glue:*",
+            "s3:*",
+            "lambda:*",
+            "dynamodb:*",
+            "cloudwatch:PutMetricAlarm",
+            "cloudwatch:DescribeAlarms",
+            "cloudwatch:DeleteAlarms",
+            "cloudformation:DescribeStacks",
+            "cloudformation:ListStackResources",
+            "cloudwatch:ListMetrics",
+            "cloudwatch:GetMetricData",
+            "ec2:DescribeSecurityGroups",
+            "ec2:DescribeSubnets",
+            "ec2:DescribeVpcs",
+            "kms:ListAliases",
+            "iam:GetPolicy",
+            "iam:GetPolicyVersion",
+            "iam:GetRole",
+            "iam:GetRolePolicy",
+            "iam:ListAttachedRolePolicies",
+            "iam:ListRolePolicies",
+            "iam:ListRoles",
+            "lambda:*",
+            "logs:DescribeLogGroups",
+            "states:DescribeStateMachine",
+            "states:ListStateMachines",
+            "tag:GetResources",
+            "xray:GetTraceSummaries",
+            "xray:BatchGetTraces",
+          ],
+          Resource: "*",
+        },
+        {
+          Action: [
+            "dynamodb:*",
+            "dax:*",
+            "application-autoscaling:*",
+            "iam:GetRole",
+            "iam:ListRoles",
+            "kms:DescribeKey",
+            "kms:ListAliases",
+            "resource-groups:*",
+            "tag:GetResources",
+          ],
+          Effect: "Allow",
+          Resource: "*",
+        },
+        {
+          Action: [
+            "iam:PassRole",
+          ],
+          Effect: "Allow",
+          Resource: "*",
+          Condition: {
+            StringLike: {
+              'iam:PassedToService': [
+                "application-autoscaling.amazonaws.com",
+                "application-autoscaling.amazonaws.com.cn",
+                "dax.amazonaws.com",
               ],
-              "Resource": "*"
+            },
           },
-        {
-            "Action": [
-                "dynamodb:*",
-                "dax:*",
-                "application-autoscaling:*",
-                "iam:GetRole",
-                "iam:ListRoles",
-                "kms:DescribeKey",
-                "kms:ListAliases",
-                "resource-groups:*",
-                "tag:GetResources"
-            ],
-            "Effect": "Allow",
-            "Resource": "*"
         },
         {
-            "Action": [
-                "iam:PassRole"
-            ],
-            "Effect": "Allow",
-            "Resource": "*",
-            "Condition": {
-                "StringLike": {
-                    "iam:PassedToService": [
-                        "application-autoscaling.amazonaws.com",
-                        "application-autoscaling.amazonaws.com.cn",
-                        "dax.amazonaws.com"
-                    ]
-                }
-            }
+          Effect: "Allow",
+          Action: [
+            "iam:CreateServiceLinkedRole",
+          ],
+          Resource: "*",
+          Condition: {
+            StringEquals: {
+              'iam:AWSServiceName': [
+                "replication.dynamodb.amazonaws.com",
+                "dax.amazonaws.com",
+                "dynamodb.application-autoscaling.amazonaws.com",
+                "contributorinsights.dynamodb.amazonaws.com",
+              ],
+            },
+          },
         },
         {
-            "Effect": "Allow",
-            "Action": [
-                "iam:CreateServiceLinkedRole"
-            ],
-            "Resource": "*",
-            "Condition": {
-                "StringEquals": {
-                    "iam:AWSServiceName": [
-                        "replication.dynamodb.amazonaws.com",
-                        "dax.amazonaws.com",
-                        "dynamodb.application-autoscaling.amazonaws.com",
-                        "contributorinsights.dynamodb.amazonaws.com"
-                    ]
-                }
-            }
+          Effect: "Allow",
+          Action: "iam:PassRole",
+          Resource: "*",
+          Condition: {
+            StringEquals: {
+              'iam:PassedToService': "lambda.amazonaws.com",
+            },
+          },
         },
-        {
-            "Effect": "Allow",
-            "Action": "iam:PassRole",
-            "Resource": "*",
-            "Condition": {
-                "StringEquals": {
-                    "iam:PassedToService": "lambda.amazonaws.com"
-                }
-            }
-        }
-      ]
+      ],
     }
   end
 
@@ -428,33 +443,33 @@ class StackCreator
 
   def step_function_policy(stack)
     {
-      "Version": "2012-10-17",
-      "Statement": [
+      Version: "2012-10-17",
+      Statement: [
         {
-            "Sid": "VisualEditor0",
-            "Effect": "Allow",
-            "Action": "lambda:InvokeFunction",
-            "Resource": stack.orchestration_function_arn
+          Sid: "VisualEditor0",
+          Effect: "Allow",
+          Action: "lambda:InvokeFunction",
+          Resource: stack.orchestration_function_arn,
         },
         {
-            "Sid": "VisualEditor1",
-            "Effect": "Allow",
-            "Action": "lambda:InvokeFunction",
-            "Resource": stack.orchestration_function_arn
+          Sid: "VisualEditor1",
+          Effect: "Allow",
+          Action: "lambda:InvokeFunction",
+          Resource: stack.orchestration_function_arn,
         },
         {
-            "Effect": "Allow",
-            "Action": [
-                "xray:PutTraceSegments",
-                "xray:PutTelemetryRecords",
-                "xray:GetSamplingRules",
-                "xray:GetSamplingTargets"
-            ],
-            "Resource": [
-                "*"
-            ]
-        }
-      ]
+          Effect: "Allow",
+          Action: [
+            "xray:PutTraceSegments",
+            "xray:PutTelemetryRecords",
+            "xray:GetSamplingRules",
+            "xray:GetSamplingTargets",
+          ],
+          Resource: [
+            "*",
+          ],
+        },
+      ],
     }
   end
 
@@ -462,121 +477,121 @@ class StackCreator
 
   def create_step_function_definition(stack)
     {
-      "Comment": "A description of my state machine",
-      "StartAt": "Step Reducer Params",
-      "States": {
-        "Step Reducer Params": {
-          "Type": "Pass",
-          "Result": "REDUCE_RESULTS",
-          "ResultPath": "$.msg_type",
-          "Next": "Step Reducer"
+      Comment: "A description of my state machine",
+      StartAt: "Step Reducer Params",
+      States: {
+        'Step Reducer Params': {
+          Type: "Pass",
+          Result: "REDUCE_RESULTS",
+          ResultPath: "$.msg_type",
+          Next: "Step Reducer",
         },
-        "Step Reducer": {
-          "Type": "Task",
-          "Resource": "arn:aws:states:::lambda:invoke",
-          "InputPath": "$",
-          "OutputPath": "$.Payload.body",
-          "ResultPath": "$",
-          "Parameters": {
-            "Payload.$": "$",
-            "FunctionName": stack.orchestration_function_arn
+        'Step Reducer': {
+          Type: "Task",
+          Resource: "arn:aws:states:::lambda:invoke",
+          InputPath: "$",
+          OutputPath: "$.Payload.body",
+          ResultPath: "$",
+          Parameters: {
+            'Payload.$': "$",
+            FunctionName: stack.orchestration_function_arn,
           },
-          "Retry": [
+          Retry: [
             {
-              "ErrorEquals": [
+              ErrorEquals: [
                 "Lambda.ServiceException",
                 "Lambda.AWSLambdaException",
-                "Lambda.SdkClientException"
+                "Lambda.SdkClientException",
               ],
-              "IntervalSeconds": 2,
-              "MaxAttempts": 6,
-              "BackoffRate": 2
-            }
+              IntervalSeconds: 2,
+              MaxAttempts: 6,
+              BackoffRate: 2,
+            },
           ],
-          "Next": "Part Extractor Params"
+          Next: "Part Extractor Params",
         },
-        "Part Extractor Params": {
-          "Type": "Pass",
-          "Result": "QUEUE_EXTRACT",
-          "ResultPath": "$.msg_type",
-          "Next": "Part Extractor"
+        'Part Extractor Params': {
+          Type: "Pass",
+          Result: "QUEUE_EXTRACT",
+          ResultPath: "$.msg_type",
+          Next: "Part Extractor",
         },
-        "Part Extractor": {
-          "Type": "Task",
-          "Resource": "arn:aws:states:::lambda:invoke",
-          "InputPath": "$",
-          "OutputPath": "$.Payload.body",
-          "ResultPath": "$",
-          "Parameters": {
-            "Payload.$": "$",
-            "FunctionName": stack.orchestration_function_arn
+        'Part Extractor': {
+          Type: "Task",
+          Resource: "arn:aws:states:::lambda:invoke",
+          InputPath: "$",
+          OutputPath: "$.Payload.body",
+          ResultPath: "$",
+          Parameters: {
+            'Payload.$': "$",
+            FunctionName: stack.orchestration_function_arn,
           },
-          "Retry": [
+          Retry: [
             {
-              "ErrorEquals": [
+              ErrorEquals: [
                 "Lambda.ServiceException",
                 "Lambda.AWSLambdaException",
-                "Lambda.SdkClientException"
+                "Lambda.SdkClientException",
               ],
-              "IntervalSeconds": 2,
-              "MaxAttempts": 6,
-              "BackoffRate": 2
-            }
+              IntervalSeconds: 2,
+              MaxAttempts: 6,
+              BackoffRate: 2,
+            },
           ],
-          "Next": "Export Finalizer Params"
+          Next: "Export Finalizer Params",
         },
-        "Export Finalizer Params": {
-          "Type": "Pass",
-          "Result": "FINALIZE_EXPORT",
-          "ResultPath": "$.msg_type",
-          "Next": "Export Finalizer"
+        'Export Finalizer Params': {
+          Type: "Pass",
+          Result: "FINALIZE_EXPORT",
+          ResultPath: "$.msg_type",
+          Next: "Export Finalizer",
         },
-        "Export Finalizer": {
-          "Type": "Task",
-          "Resource": "arn:aws:states:::lambda:invoke",
-          "InputPath": "$",
-          "OutputPath": "$.Payload.body",
-          "ResultPath": "$",
-          "Parameters": {
-            "Payload.$": "$",
-            "FunctionName": stack.orchestration_function_arn
+        'Export Finalizer': {
+          Type: "Task",
+          Resource: "arn:aws:states:::lambda:invoke",
+          InputPath: "$",
+          OutputPath: "$.Payload.body",
+          ResultPath: "$",
+          Parameters: {
+            'Payload.$': "$",
+            FunctionName: stack.orchestration_function_arn,
           },
-          "Retry": [
+          Retry: [
             {
-              "ErrorEquals": [
+              ErrorEquals: [
                 "Lambda.ServiceException",
                 "Lambda.AWSLambdaException",
-                "Lambda.SdkClientException"
+                "Lambda.SdkClientException",
               ],
-              "IntervalSeconds": 2,
-              "MaxAttempts": 6,
-              "BackoffRate": 2
-            }
+              IntervalSeconds: 2,
+              MaxAttempts: 6,
+              BackoffRate: 2,
+            },
           ],
-          "Next": "Export Finalizer Choice"
+          Next: "Export Finalizer Choice",
         },
-        "Export Finalizer Choice": {
-          "Type": "Choice",
-          "Choices": [
+        'Export Finalizer Choice': {
+          Type: "Choice",
+          Choices: [
             {
-              "Not": {
-                "Variable": "$.processed",
-                "BooleanEquals": false
+              Not: {
+                Variable: "$.processed",
+                BooleanEquals: false,
               },
-              "Next": "SuccessState"
-            }
+              Next: "SuccessState",
+            },
           ],
-          "Default": "Export Finalizer Wait"
+          Default: "Export Finalizer Wait",
         },
-        "Export Finalizer Wait": {
-          "Type": "Wait",
-          "Seconds": 30,
-          "Next": "Export Finalizer Params"
+        'Export Finalizer Wait': {
+          Type: "Wait",
+          Seconds: 30,
+          Next: "Export Finalizer Params",
         },
-        "SuccessState": {
-          "Type": "Succeed"
-        }
-      }
+        SuccessState: {
+          Type: "Succeed",
+        },
+      },
     }
   end
 end

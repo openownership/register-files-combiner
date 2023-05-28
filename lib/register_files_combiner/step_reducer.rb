@@ -15,7 +15,7 @@ module RegisterFilesCombiner
       @bods_export_table = bods_export_table
     end
 
-    def call(export_id, dest_prefix)
+    def call(export_id, _dest_prefix)
       repair_table(bods_export_table)
 
       tmp_s3_prefix = "bods_exports_tmp/export_id=#{export_id}"
@@ -31,12 +31,14 @@ module RegisterFilesCombiner
                 :bods_export_table, :output_location, :bods_tmp2_table
 
     def repair_table(table_name)
-      athena_query = athena_adapter.start_query_execution({
-        query_string: "MSCK REPAIR TABLE #{athena_database}.#{table_name}",
-        result_configuration: {
-          output_location: output_location
-        }
-      })
+      athena_query = athena_adapter.start_query_execution(
+        {
+          query_string: "MSCK REPAIR TABLE #{athena_database}.#{table_name}",
+          result_configuration: {
+            output_location: output_location,
+          },
+        },
+      )
       athena_adapter.wait_for_query(athena_query.query_execution_id)
     end
 
@@ -80,17 +82,19 @@ module RegisterFilesCombiner
           WHERE
             y.row_r = 1
           ORDER BY
-            fname ASC, row_i ASC    
+            fname ASC, row_i ASC#{'    '}
       SQL
 
       LOGGER.info "EXECUTING QUERY: #{query}"
-      athena_adapter.start_query_execution({
-        query_string: query,
-        client_request_token: Digest::MD5.hexdigest(query)[0...32],
-        result_configuration: {
-          output_location: output_location
-        }
-      })
+      athena_adapter.start_query_execution(
+        {
+          query_string: query,
+          client_request_token: Digest::MD5.hexdigest(query)[0...32],
+          result_configuration: {
+            output_location: output_location,
+          },
+        },
+      )
     end
   end
 end

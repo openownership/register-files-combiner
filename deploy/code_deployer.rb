@@ -8,7 +8,7 @@ class CodeDeployer
   CmdError = Class.new(StandardError)
 
   def initialize(s3_bucket:, region:, access_key_id:, secret_access_key:, account_id:)
-    @logger = Logger.new(STDOUT)
+    @logger = Logger.new($stdout)
     @s3_bucket = s3_bucket
     @aws_region = region
     @aws_account_id = account_id
@@ -16,7 +16,7 @@ class CodeDeployer
     auth = {
       region: region,
       access_key_id: access_key_id,
-      secret_access_key: secret_access_key
+      secret_access_key: secret_access_key,
     }
 
     @lambda_client = Aws::Lambda::Client.new(**auth)
@@ -36,33 +36,35 @@ class CodeDeployer
 
   def deploy_orchestration_lambda(stack, s3_path, env_h)
     logger.info "Updating orchestration lambda env"
-    resp = lambda_client.update_function_configuration({
-      function_name: stack.orchestration_function_name,
-      environment: {
-        variables: env_h
-      }
-    })
+    resp = lambda_client.update_function_configuration(
+      {
+        function_name: stack.orchestration_function_name,
+        environment: {
+          variables: env_h,
+        },
+      },
+    )
     logger.info "Response #{resp.to_h}"
     logger.info "Waiting for function to be updated"
     lambda_client.wait_until(
       :function_updated,
-      { function_name: stack.orchestration_function_name }
+      { function_name: stack.orchestration_function_name },
     )
     logger.info "Function updated successfully"
 
     logger.info "Updating function code"
     resp = lambda_client.update_function_code(
       function_name: stack.orchestration_function_name,
-      s3_bucket: s3_bucket, 
+      s3_bucket: s3_bucket,
       s3_key: s3_path,
       publish: true,
-      architectures: ["x86_64"]
+      architectures: ["x86_64"],
     )
     logger.info "Response #{resp.to_h}"
     logger.info "Waiting for function to be updated"
     lambda_client.wait_until(
       :function_updated,
-      { function_name: stack.orchestration_function_name }
+      { function_name: stack.orchestration_function_name },
     )
     logger.info "Function updated successfully"
   end
@@ -75,7 +77,7 @@ class CodeDeployer
       'BODS_EXPORT_S3_PREFIX' => stack.s3_parts_path,
       'ATHENA_TABLE_NAME' => stack.athena_table_name,
       'CHUNK_SIZE' => '1000',
-      'PART_SIZE' => '500'
+      'PART_SIZE' => '500',
     )
   end
 end

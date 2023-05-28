@@ -1,7 +1,7 @@
 module RegisterFilesCombiner
   module Adapters
     class ErrorAdapter
-      def error(message)
+      def error(_message)
         nil # TODO: Rollbar
       end
     end

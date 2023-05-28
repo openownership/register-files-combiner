@@ -62,10 +62,14 @@ RSpec.describe RegisterFilesCombiner::Adapters::SqsFakeAdapter do
       it 'returns unprocessed message' do
         messages = subject.receive_messages(queue_url)
 
-        expect(messages).to eq([{
-          content: sample_message,
-          receipt_handle: sample_message_receipt_handle
-        }])
+        expect(messages).to eq(
+          [
+            {
+              content: sample_message,
+              receipt_handle: sample_message_receipt_handle,
+            },
+          ],
+        )
       end
     end
   end
@@ -79,10 +83,14 @@ RSpec.describe RegisterFilesCombiner::Adapters::SqsFakeAdapter do
         subject.send_messages(queue_url, messages: [sample_message])
 
         messages = subject.receive_messages(queue_url)
-        expect(messages).to eq([{
-          content: sample_message,
-          receipt_handle: sample_message_receipt_handle
-        }])
+        expect(messages).to eq(
+          [
+            {
+              content: sample_message,
+              receipt_handle: sample_message_receipt_handle,
+            },
+          ],
+        )
       end
     end
   end

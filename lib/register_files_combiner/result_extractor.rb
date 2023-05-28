@@ -5,7 +5,7 @@ module RegisterFilesCombiner
   class ResultExtractor
     def initialize(
       s3_adapter:  S3_ADAPTER,
-      s3_bucket:   S3_BUCKET,  
+      s3_bucket:   S3_BUCKET,
       sqs_adapter: SQS_ADAPTER,
       queue_url:   POST_PROCESS_QUEUE_URL
     )
@@ -22,10 +22,10 @@ module RegisterFilesCombiner
       keys.each do |s3_path|
         messages = [
           {
-            msg_type:  'EXTRACT_PART',
+            msg_type: 'EXTRACT_PART',
             export_id: export_id,
-            s3_path:   s3_path
-          }
+            s3_path: s3_path,
+          },
         ]
         LOGGER.info "Queueing #{s3_path}"
 
@@ -38,6 +38,7 @@ module RegisterFilesCombiner
     def extract_part(export_id, s3_path)
       part_match = /part_id=part(?<part_id>[\d-]+)/.match(s3_path)
       raise 'no part' unless part_match
+
       part_id = "part#{part_match[:part_id]}"
 
       dst_s3_prefix = "bods_exports_results"

@@ -61,11 +61,11 @@ module RegisterFilesCombiner
           s3_bucket: s3_bucket,
           source_path: key,
           dest_path: dest_path,
-          part_number: (index+1),
-          upload_id: upload_id
+          part_number: (index + 1),
+          upload_id: upload_id,
         ).copy_part_result.etag
 
-        parts << { etag: etag, part_number: (index+1) }
+        parts << { etag: etag, part_number: (index + 1) }
       end
 
       s3_adapter.complete_multipart_upload(s3_bucket: s3_bucket, s3_path: dest_path, upload_id: upload_id, parts: parts)
