@@ -36,7 +36,12 @@ jobs:
           paths:
             - vendor/bundle
 
+      # Unit tests
       - run:
           command: bundle exec rspec
           environment:
             RACK_ENV: test
+
+      # Linting
+      - run:
+          command: bundle exec rubocop

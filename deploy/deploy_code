@@ -10,13 +10,13 @@ code_version = ARGV[1]
 env_name = ARGV[2]
 
 code_deployer = CodeDeployer.new(
-  region: ENV['AWS_REGION'],
-  access_key_id: ENV['ACCESS_KEY_ID'],
-  secret_access_key: ENV['SECRET_ACCESS_KEY'],
-  s3_bucket: ENV['CODE_BUCKET'],
-  account_id: ENV.fetch('AWS_ACCOUNT_ID')
+  region: ENV.fetch('AWS_REGION', nil),
+  access_key_id: ENV.fetch('ACCESS_KEY_ID', nil),
+  secret_access_key: ENV.fetch('SECRET_ACCESS_KEY', nil),
+  s3_bucket: ENV.fetch('CODE_BUCKET', nil),
+  account_id: ENV.fetch('AWS_ACCOUNT_ID'),
 )
 
-s3_path = File.join(ENV['CODE_PREFIX'], "register_files_combiner_#{code_version}.zip")
+s3_path = File.join(ENV.fetch('CODE_PREFIX', nil), "register_files_combiner_#{code_version}.zip")
 env_path = File.expand_path("../envs/#{env_name}.json", __FILE__)
 code_deployer.call(stack_name, s3_path, env: JSON.parse(File.read(env_path)))

@@ -4,7 +4,7 @@ require 'aws-sdk-s3'
 class CodePackager
   CmdError = Class.new(StandardError)
 
-  def initialize(s3_bucket: nil, repo:, region:, access_key_id:, secret_access_key:)
+  def initialize(repo:, region:, access_key_id:, secret_access_key:, s3_bucket: nil)
     @s3_bucket = s3_bucket
     @repo = repo
     @s3_client = Aws::S3::Client.new(
@@ -18,7 +18,7 @@ class CodePackager
     Dir.mktmpdir do |dir|
       # Clone copy of branch
       code_path = File.join(dir, 'code')
-      git_sha = clone(branch, code_path)
+      clone(branch, code_path)
 
       # Install packages and create zip file
       zip_path = File.join(dir, 'function.zip')

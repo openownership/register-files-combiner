@@ -1,5 +1,5 @@
 class Stack
-  PREFIX = 'register_bods_exporter'
+  PREFIX = 'register_bods_exporter'.freeze
 
   def initialize(name, aws_region:, account_id:)
     @name = name

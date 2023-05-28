@@ -3,7 +3,7 @@ require 'aws-sdk-sqs'
 module RegisterFilesCombiner
   module Adapters
     class SqsAdapter
-      DEFAULT_IDEMPOTENCY_TOKEN = 'idemp'
+      DEFAULT_IDEMPOTENCY_TOKEN = 'idemp'.freeze
 
       def initialize(region:, access_key_id:, secret_access_key:)
         @client = Aws::SQS::Client.new(
@@ -14,29 +14,33 @@ module RegisterFilesCombiner
       end
 
       def delete_message(queue_url, receipt_handle:)
-        client.delete_message({
-          queue_url: queue_url,
-          receipt_handle: receipt_handle
-        })
+        client.delete_message(
+          {
+            queue_url: queue_url,
+            receipt_handle: receipt_handle,
+          },
+        )
       end
 
       def receive_messages(queue_url, limit: 1)
         queue = Aws::SQS::Queue.new(queue_url, client: client)
 
-        collection = queue.receive_messages({
-          attribute_names: ["All"],
-          message_attribute_names: ["MessageAttributeName"],
-          max_number_of_messages: limit,
-          visibility_timeout: 1000,
-          wait_time_seconds: 5
-        })
+        collection = queue.receive_messages(
+          {
+            attribute_names: ["All"],
+            message_attribute_names: ["MessageAttributeName"],
+            max_number_of_messages: limit,
+            visibility_timeout: 1000,
+            wait_time_seconds: 5,
+          },
+        )
 
-        return [] if collection.size == 0
-        
+        return [] if collection.empty?
+
         collection.map do |message|
           {
             receipt_handle: message.receipt_handle,
-            content: JSON.parse(message.body)
+            content: JSON.parse(message.body),
           }
         end
       end
@@ -48,10 +52,12 @@ module RegisterFilesCombiner
           { id: id, message_body: content_json }
         end
 
-        client.send_message_batch({
-          queue_url: queue_url,
-          entries: msgs
-        })
+        client.send_message_batch(
+          {
+            queue_url: queue_url,
+            entries: msgs,
+          },
+        )
       end
 
       private
