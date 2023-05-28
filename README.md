@@ -1,7 +1,7 @@
 # Open Ownership Register Exporter
 
 This repository contains the code which exports the beneficial ownership
-data stored in the OpenOwnership Register database. The input source is
+data stored in the Open Ownership Register database. The input source is
 a MongoDB database, with the data processed and mapped into a Gzipped
 JSON-lines file, stored in S3.
 
